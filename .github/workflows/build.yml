@@ -34,7 +34,7 @@ jobs:
           set -euo pipefail
           for pkg in zotero-bin helium-browser-bin; do
             cp -r "/work/aurpkgbuilds/$pkg" "/work/src/$pkg"
-            (cd "/work/src/$pkg" && makepkg -s --noconfirm --nocheck --skipverify)
+            (cd "/work/src/$pkg" && makepkg -s --noconfirm --nocheck --skippgpcheck)
             cp "/work/src/$pkg"/*.pkg.tar.zst /work/dist/
           done
           EOS

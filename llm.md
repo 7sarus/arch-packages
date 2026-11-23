@@ -20,7 +20,7 @@ Workflow runs on `main` push, `workflow_dispatch`, and weekly cron. Local check:
 cd aurpkgbuilds/zotero-bin && makepkg -s --noconfirm --nocheck --skipverify
 ```
 
-`--skipverify` skips PGP but keeps sha256 checks; needed because Helium's
+`--skippgpcheck` skips PGP but keeps sha256 checks; needed because Helium's
 PKGBUILD verifies an external `.asc` that is unreliable in CI.
 
 Manual trigger: `gh workflow run build.yml -R 7sarus/arch-packages`.
