@@ -38,11 +38,16 @@ jobs:
             "https://api.github.com/repos/${{ github.repository }}/releases/tags/packages" \
             | grep -o '"name": *"[^"]*"' | cut -d'"' -f4 || true)
           changed=""
-          for pkg in zotero-bin helium-browser-bin rstudio-desktop-bin; do
-            info="$GITHUB_WORKSPACE/aurpkgbuilds/$pkg/.SRCINFO"
+          for dir in "$GITHUB_WORKSPACE"/aurpkgbuilds/*/; do
+            pkg=$(basename "$dir")
+            info="$dir/.SRCINFO"
             ver=$(awk -F' = ' '$1 ~ /pkgver$/ {print $2; exit}' "$info")
             rel=$(awk -F' = ' '$1 ~ /pkgrel$/ {print $2; exit}' "$info")
-            file="$pkg-$ver-$rel-x86_64.pkg.tar.zst"
+            arch=x86_64
+            if awk -F' = ' '$1 ~ /arch$/ {print $2}' "$info" | grep -qx any; then
+              arch=any
+            fi
+            file="$pkg-$ver-$rel-$arch.pkg.tar.zst"
             if printf '%s\n' "$assets" | grep -qx "$file"; then
               echo "$pkg $ver-$rel already published"
             else
@@ -96,7 +101,7 @@ jobs:
         with:
           tag_name: packages
           name: Arch packages
-          body: Auto-built zotero-bin and helium-browser-bin from vendored PKGBUILDs.
+          body: Auto-built from the PKGBUILDs vendored in this repository.
           overwrite_files: true
           fail_on_unmatched_files: true
           files: |
