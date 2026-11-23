@@ -46,7 +46,8 @@ jobs:
       - name: Create package database
         run: |
           cd /work/dist
-          repo-add -n -R arch-packages.db.tar.gz *.pkg.tar.zst
+          repo-add -R arch-packages.db.tar.gz *.pkg.tar.zst
+          rm -f arch-packages.db arch-packages.files
           cp arch-packages.db.tar.gz arch-packages.db
           cp arch-packages.files.tar.gz arch-packages.files
           ls -lh
