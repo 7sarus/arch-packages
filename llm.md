@@ -43,9 +43,21 @@ Then `sudo pacman -Syu`. Repo database name is `arch-packages.db`, so the
 Copy fresh files from AUR into `aurpkgbuilds/<pkgname>/`, commit, push. The
 workflow rebuilds and replaces the release assets. Do not edit checksums by hand.
 
+## Status (2026-11-23)
+
+- Two CI bugs fixed: invalid `makepkg --skipverify` → `--skippgpcheck`, and
+  Helium's upstream `.gitignore` (`*`) hid its PKGBUILD from git (deleted it,
+  force-added the files).
+- Verification run `45117021445` was still `in_progress` at save time. Check
+  with `gh run view 45117021445` from this dir, or `gh run list`.
+- Not yet done: first successful release, `pacman.conf` entry, vscodium removal.
+  Both remaining steps need sudo (password required here; agent cannot do it).
+
 ## Conventions
 
 - Repo files are user-owned; no root needed. Only `pacman.conf` and package
   removal need sudo (password required on this host; agent cannot do it).
 - Keep the workflow self-contained; it does not read any local machine state.
 - Release tag is always `packages`, with `overwrite_files: true`.
+- When refreshing AUR snapshots, re-check for an upstream `.gitignore` with
+  `*`; it silently drops every vendored file from the commit.
