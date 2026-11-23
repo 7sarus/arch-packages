@@ -1,9 +1,9 @@
 # arch-packages
 
 A small Arch pacman repository built by GitHub Actions. It rebuilds three AUR
-packages, `zotero-bin`, `helium-browser-bin`, and `calibre-bin`, and publishes
-them from the `packages` release, so this host gets them without building on the
-AUR each time.
+packages, `zotero-bin`, `helium-browser-bin`, and `rstudio-desktop-bin`, and
+publishes them from the `packages` release, so this host gets them without
+building on the AUR each time.
 
 ## Packages
 
@@ -11,14 +11,14 @@ AUR each time.
 | --- | --- | --- | --- | --- |
 | `zotero-bin` | 10.0.8-2 | [zotero.org download](https://www.zotero.org/download) | juanmah | 2026-11-14 |
 | `helium-browser-bin` | 0.22.2.1-1 | [helium-linux releases](https://github.com/imputnet/helium-linux/releases) | playleft | 2026-11-21 |
-| `calibre-bin` | 9.19.0-1 | [download.calibre-ebook.com](https://download.calibre-ebook.com) | alllexx88 | 2026-11-21 |
+| `rstudio-desktop-bin` | 2026.11.0.203-1 | [RStudio download](https://download1.rstudio.org/electron/jammy/amd64/) | cbrnr | 2026-11-13 |
 
 The PKGBUILDs start as copies of the AUR packages, kept in
 `aurpkgbuilds/<pkgname>/`. Credit for them goes to the AUR maintainers above.
 `zotero-bin` also credits contributor Matthias Kurz, and `helium-browser-bin`
-credits contributors Pujan Modha and init_harsh. `calibre-bin` drops the AUR
-package's man-page generation, which needs sphinx and the calibre source tree;
-the binary itself is unchanged.
+credits contributors Pujan Modha and init_harsh. `rstudio-desktop-bin` drops the
+bundled Copilot language server and the development files, which the IDE does
+not need at runtime.
 
 ## Client setup
 

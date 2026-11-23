@@ -38,7 +38,7 @@ jobs:
             "https://api.github.com/repos/${{ github.repository }}/releases/tags/packages" \
             | grep -o '"name": *"[^"]*"' | cut -d'"' -f4 || true)
           changed=""
-          for pkg in zotero-bin helium-browser-bin calibre-bin; do
+          for pkg in zotero-bin helium-browser-bin rstudio-desktop-bin; do
             info="$GITHUB_WORKSPACE/aurpkgbuilds/$pkg/.SRCINFO"
             ver=$(awk -F' = ' '$1 ~ /pkgver$/ {print $2; exit}' "$info")
             rel=$(awk -F' = ' '$1 ~ /pkgrel$/ {print $2; exit}' "$info")
