@@ -1,0 +1,66 @@
+name: Build and publish AUR packages
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '17 6 * * 1'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:base-devel
+    steps:
+      - name: Check out PKGBUILDs
+        uses: actions/checkout@v4
+
+      - name: Prepare builder
+        run: |
+          pacman -Syu --noconfirm --needed git sudo
+          useradd -m builder
+          install -d -m 0755 -o builder -g builder /work/src /work/dist
+          echo 'builder ALL=(ALL:ALL) NOPASSWD: /usr/bin/pacman' > /etc/sudoers.d/builder
+          chmod 0440 /etc/sudoers.d/builder
+
+      - name: Build packages
+        run: |
+          cat > /work/build.sh <<'EOS'
+          #!/bin/bash
+          set -euo pipefail
+          for pkg in zotero-bin helium-browser-bin; do
+            cp -r "/work/aurpkgbuilds/$pkg" "/work/src/$pkg"
+            (cd "/work/src/$pkg" && makepkg -s --noconfirm --nocheck --skippgpcheck)
+            cp "/work/src/$pkg"/*.pkg.tar.zst /work/dist/
+          done
+          EOS
+          chmod +x /work/build.sh
+          cp -r "$GITHUB_WORKSPACE/aurpkgbuilds" /work/aurpkgbuilds
+          chown -R builder:builder /work
+          su builder -c /work/build.sh
+
+      - name: Create package database
+        run: |
+          cd /work/dist
+          repo-add -R arch-packages.db.tar.gz *.pkg.tar.zst
+          # Extract db and files from the tarball so they're available as standalone files
+          tar -xzf arch-packages.db.tar.gz -C /work/dist
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: packages
+          name: Arch packages
+          body: Auto-built zotero-bin and helium-browser-bin from vendored PKGBUILDs.
+          overwrite_files: true
+          fail_on_unmatched_files: true
+          files: |
+            /work/dist/*.pkg.tar.zst
+            /work/dist/arch-packages.db
+            /work/dist/arch-packages.db.tar.gz
+            /work/dist/arch-packages.files
+            /work/dist/arch-packages.files.tar.gz
