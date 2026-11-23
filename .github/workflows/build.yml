@@ -30,19 +30,24 @@ jobs:
           echo 'builder ALL=(ALL:ALL) NOPASSWD: /usr/bin/pacman' > /etc/sudoers.d/builder
           chmod 0440 /etc/sudoers.d/builder
 
-      - name: Check for source changes
+      - name: Check for new versions
         id: gate
         run: |
           set -euo pipefail
-          prev=$(curl -fsSL "https://github.com/7sarus/arch-packages/releases/latest/download/builds.sha256" 2>/dev/null || true)
-          : > /work/srcsums
+          assets=$(curl -fsSL -H "Authorization: Bearer ${{ github.token }}" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/tags/packages" \
+            | grep -o '"name": *"[^"]*"' | cut -d'"' -f4 || true)
           changed=""
           for pkg in zotero-bin helium-browser-bin; do
-            sum=$(cd "$GITHUB_WORKSPACE/aurpkgbuilds/$pkg" &&
-                  find . -type f -exec sha256sum {} + | sort | sha256sum | cut -d' ' -f1)
-            echo "$pkg=$sum" >> /work/srcsums
-            old=$(printf '%s\n' "$prev" | sed -n "s/^$pkg=//p" | head -n1)
-            if [ "$sum" != "$old" ]; then changed="${changed}${changed:+ }$pkg"; fi
+            info="$GITHUB_WORKSPACE/aurpkgbuilds/$pkg/.SRCINFO"
+            ver=$(awk -F' = ' '$1 ~ /pkgver$/ {print $2; exit}' "$info")
+            rel=$(awk -F' = ' '$1 ~ /pkgrel$/ {print $2; exit}' "$info")
+            file="$pkg-$ver-$rel-x86_64.pkg.tar.zst"
+            if printf '%s\n' "$assets" | grep -qx "$file"; then
+              echo "$pkg $ver-$rel already published"
+            else
+              changed="${changed}${changed:+ }$pkg"
+            fi
           done
           printf '%s' "$changed" > /work/build-list
           echo "changed=$changed" >> "$GITHUB_OUTPUT"
@@ -72,7 +77,6 @@ jobs:
           repo-add -R arch-packages.db.tar.gz *.pkg.tar.zst
           # Extract db and files from the tarball so they're available as standalone files
           tar -xzf arch-packages.db.tar.gz -C /work/dist
-          cp /work/srcsums builds.sha256
 
       - name: Publish release
         if: steps.gate.outputs.changed != ''
@@ -89,4 +93,3 @@ jobs:
             /work/dist/arch-packages.db.tar.gz
             /work/dist/arch-packages.files
             /work/dist/arch-packages.files.tar.gz
-            /work/dist/builds.sha256
