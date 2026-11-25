@@ -28,7 +28,7 @@ jobs:
         run: |
           pacman -Syu --noconfirm --needed git sudo curl jq
           useradd -m builder
-          install -d -m 0755 -o builder -g builder /work/src /work/dist
+          install -d -m 0755 -o builder -g builder /work/src /work/new
           echo 'builder ALL=(ALL:ALL) NOPASSWD: /usr/bin/pacman' > /etc/sudoers.d/builder
           chmod 0440 /etc/sudoers.d/builder
 
@@ -44,8 +44,11 @@ jobs:
           for dir in "$GITHUB_WORKSPACE"/aurpkgbuilds/*/; do
             pkg=$(basename "$dir")
             info="$dir/.SRCINFO"
-            # makepkg refuses to run as root; the committed .SRCINFO must match the PKGBUILD
-            su builder -c "cd '$dir' && makepkg --printsrcinfo" | diff -q "$info" - >/dev/null \
+            # makepkg refuses to run as root and needs write access to the PKGBUILD dir, so use a builder-owned copy
+            mkdir -p /work/check
+            cp -r "$dir" "/work/check/$pkg"
+            chown -R builder:builder "/work/check/$pkg"
+            su builder -c "cd '/work/check/$pkg' && makepkg --printsrcinfo" | diff -q "$info" - >/dev/null \
               || { echo "$pkg: .SRCINFO is out of date, regenerate with makepkg --printsrcinfo"; exit 1; }
             ver=$(awk -F' = ' '$1 ~ /pkgver$/ {print $2; exit}' "$info")
             rel=$(awk -F' = ' '$1 ~ /pkgrel$/ {print $2; exit}' "$info")
@@ -79,7 +82,7 @@ jobs:
             files=$(makepkg --packagelist)
             for f in $files; do
               case "$(basename "$f")" in
-                "$pkg-$full-"*) cp "$f" /work/dist/ ;;
+                "$pkg-$full-"*) cp "$f" /work/new/ ;;
                 "$pkg-debug-$full-"*) ;;
                 *) echo "unexpected package file: $f" >&2; exit 1 ;;
               esac
@@ -95,17 +98,15 @@ jobs:
         if: steps.gate.outputs.changed != ''
         run: |
           set -euo pipefail
-          cd /work/dist
+          mkdir -p /work/db && cd /work/db
           api="https://api.github.com/repos/${{ github.repository }}/releases/tags/packages"
           # Rebuild from every published package, not just this run's output
           urls=$(curl -fsSL -H "Authorization: Bearer ${{ github.token }}" "$api" \
             | jq -r '.assets[].browser_download_url | select(endswith(".pkg.tar.zst"))')
-          tmp=$(mktemp -d)
-          while read -r url; do curl -fsSL -o "$tmp/${url##*/}" "$url"; done <<< "$urls"
-          [[ $(find "$tmp" -name '*.pkg.tar.zst' | wc -l) -eq $(wc -l <<< "$urls") ]] \
+          while read -r url; do curl -fsSLO "$url"; done <<< "$urls"
+          [[ $(ls *.pkg.tar.zst | wc -l) -eq $(wc -l <<< "$urls") ]] \
             || { echo "downloaded package count does not match release assets" >&2; exit 1; }
-          # -n keeps this run's build if a name collides
-          mv -n "$tmp"/*.pkg.tar.zst .
+          cp /work/new/*.pkg.tar.zst .
           # Drop packages no longer vendored in this repo
           for f in *.pkg.tar.zst; do
             name=$(tar -xOf "$f" .PKGINFO | awk -F' = ' '/^pkgname/{print $2; exit}')
@@ -127,8 +128,8 @@ jobs:
           overwrite_files: true
           fail_on_unmatched_files: true
           files: |
-            /work/dist/*.pkg.tar.zst
-            /work/dist/arch-packages.db
-            /work/dist/arch-packages.db.tar.gz
-            /work/dist/arch-packages.files
-            /work/dist/arch-packages.files.tar.gz
+            /work/new/*.pkg.tar.zst
+            /work/db/arch-packages.db
+            /work/db/arch-packages.db.tar.gz
+            /work/db/arch-packages.files
+            /work/db/arch-packages.files.tar.gz
