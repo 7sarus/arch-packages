@@ -16,6 +16,7 @@ host gets them without building on the AUR each time.
 | `morphe-desktop` | 2.3.0-1 | [morphe-desktop releases](https://github.com/MorpheApp/morphe-desktop/releases) | lapsus | 2026-11-21 |
 | `nuvio-desktop-bin` | 0.1.38alpha-1 | [NuvioDesktop releases](https://github.com/NuvioMedia/NuvioDesktop/releases) | glorious-yellow | 2026-11-19 |
 | `rstudio-desktop-bin` | 2026.11.0.203-1 | [RStudio download](https://download1.rstudio.org/electron/jammy/amd64/) | cbrnr | 2026-11-13 |
+| `telegram-desktop-bin` | 7.4.6-1 | [tdesktop releases](https://github.com/telegramdesktop/tdesktop/releases) | debendraoli | 2026-11-24 |
 | `vectorcraft-bin` | 0.24.1-1 | [vectorcraft releases](https://github.com/storytold/vectorcraft/releases) | modinfo | 2026-11-12 |
 | `zotero-bin` | 10.0.8-2 | [zotero.org download](https://www.zotero.org/download) | juanmah | 2026-11-14 |
 
