@@ -41,7 +41,7 @@ Then:
 
 ```bash
 sudo pacman -Syu
-sudo pacman -S arch-packages/zotero-bin arch-packages/helium-browser-bin
+sudo pacman -S arch-packages/<pkgname>   # any name from the table, e.g. zotero-bin
 ```
 
 If the package is already installed from the AUR, remove it first with
@@ -51,7 +51,7 @@ install that follows comes from this repo.
 ## Updating a package
 
 Copy the current AUR snapshot over the vendored files, commit, and push. The
-workflow rebuilds both packages and overwrites the release assets.
+workflow rebuilds the changed package and overwrites the release assets.
 
 ```bash
 curl -fsSL "https://aur.archlinux.org/cgit/aur.git/snapshot/zotero-bin.tar.gz" | \
