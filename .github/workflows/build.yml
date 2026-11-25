@@ -78,8 +78,11 @@ jobs:
             # Ship only the files makepkg names, and only under this directory's name and version
             files=$(makepkg --packagelist)
             for f in $files; do
-              [[ "$(basename "$f")" == "$pkg-$full-"* ]] || { echo "unexpected package file: $f" >&2; exit 1; }
-              cp "$f" /work/dist/
+              case "$(basename "$f")" in
+                "$pkg-$full-"*) cp "$f" /work/dist/ ;;
+                "$pkg-debug-$full-"*) ;;
+                *) echo "unexpected package file: $f" >&2; exit 1 ;;
+              esac
             done
           done < /work/build-list
           EOS
