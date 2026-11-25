@@ -20,7 +20,9 @@ jobs:
       image: archlinux:base-devel
     steps:
       - name: Check out PKGBUILDs
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
       - name: Prepare builder
         run: |
@@ -38,9 +40,13 @@ jobs:
             "https://api.github.com/repos/${{ github.repository }}/releases/tags/packages" \
             | grep -o '"name": *"[^"]*"' | cut -d'"' -f4 || true)
           changed=""
+          list=""
           for dir in "$GITHUB_WORKSPACE"/aurpkgbuilds/*/; do
             pkg=$(basename "$dir")
             info="$dir/.SRCINFO"
+            # makepkg refuses to run as root; the committed .SRCINFO must match the PKGBUILD
+            su builder -c "cd '$dir' && makepkg --printsrcinfo" | diff -q "$info" - >/dev/null \
+              || { echo "$pkg: .SRCINFO is out of date, regenerate with makepkg --printsrcinfo"; exit 1; }
             ver=$(awk -F' = ' '$1 ~ /pkgver$/ {print $2; exit}' "$info")
             rel=$(awk -F' = ' '$1 ~ /pkgrel$/ {print $2; exit}' "$info")
             arch=x86_64
@@ -52,9 +58,10 @@ jobs:
               echo "$pkg $ver-$rel already published"
             else
               changed="${changed}${changed:+ }$pkg"
+              list="$list$pkg $ver-$rel"$'\n'
             fi
           done
-          printf '%s' "$changed" > /work/build-list
+          printf '%s' "$list" > /work/build-list
           echo "changed=$changed" >> "$GITHUB_OUTPUT"
           echo "will build: ${changed:-nothing}"
 
@@ -64,11 +71,17 @@ jobs:
           cat > /work/build.sh <<'EOS'
           #!/bin/bash
           set -euo pipefail
-          for pkg in $(cat /work/build-list); do
+          while read -r pkg full; do
             cp -r "/work/aurpkgbuilds/$pkg" "/work/src/$pkg"
-            (cd "/work/src/$pkg" && makepkg -s --noconfirm --nocheck --skippgpcheck)
-            cp "/work/src/$pkg"/*.pkg.tar.zst /work/dist/
-          done
+            cd "/work/src/$pkg"
+            makepkg -s --noconfirm --nocheck --skippgpcheck
+            # Ship only the files makepkg names, and only under this directory's name and version
+            files=$(makepkg --packagelist)
+            for f in $files; do
+              [[ "$(basename "$f")" == "$pkg-$full-"* ]] || { echo "unexpected package file: $f" >&2; exit 1; }
+              cp "$f" /work/dist/
+            done
+          done < /work/build-list
           EOS
           chmod +x /work/build.sh
           cp -r "$GITHUB_WORKSPACE/aurpkgbuilds" /work/aurpkgbuilds
@@ -78,12 +91,18 @@ jobs:
       - name: Create package database
         if: steps.gate.outputs.changed != ''
         run: |
+          set -euo pipefail
           cd /work/dist
           api="https://api.github.com/repos/${{ github.repository }}/releases/tags/packages"
           # Rebuild from every published package, not just this run's output
-          curl -fsSL -H "Authorization: Bearer ${{ github.token }}" "$api" \
-            | jq -r '.assets[].browser_download_url | select(endswith(".pkg.tar.zst"))' \
-            | while read -r url; do curl -fsSLO "$url"; done
+          urls=$(curl -fsSL -H "Authorization: Bearer ${{ github.token }}" "$api" \
+            | jq -r '.assets[].browser_download_url | select(endswith(".pkg.tar.zst"))')
+          tmp=$(mktemp -d)
+          while read -r url; do curl -fsSL -o "$tmp/${url##*/}" "$url"; done <<< "$urls"
+          [[ $(find "$tmp" -name '*.pkg.tar.zst' | wc -l) -eq $(wc -l <<< "$urls") ]] \
+            || { echo "downloaded package count does not match release assets" >&2; exit 1; }
+          # -n keeps this run's build if a name collides
+          mv -n "$tmp"/*.pkg.tar.zst .
           # Drop packages no longer vendored in this repo
           for f in *.pkg.tar.zst; do
             name=$(tar -xOf "$f" .PKGINFO | awk -F' = ' '/^pkgname/{print $2; exit}')
@@ -97,7 +116,7 @@ jobs:
 
       - name: Publish release
         if: steps.gate.outputs.changed != ''
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           tag_name: packages
           name: Arch packages

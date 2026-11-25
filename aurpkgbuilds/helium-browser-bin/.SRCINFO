@@ -1,11 +1,3 @@
-# Maintainer: Sam Sinclair <sam at playleft dot com>
-# Contributor: Pujan Modha <pujan.pm@hotmail.com>
-# Contributor: init_harsh
-# /*
-#  * SPDX-FileCopyrightText: 2025 Arch Linux Contributors
-#  *
-#  * SPDX-License-Identifier: 0BSD
-#  */
 pkgbase = helium-browser-bin
 	pkgdesc = Private, fast, and honest web browser based on Chromium (Latest/Stable)
 	pkgver = 0.22.2.1
