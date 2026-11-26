@@ -8,7 +8,9 @@ on:
       - 'aurpkgbuilds/**'
       - '.github/workflows/build.yml'
   schedule:
-    - cron: '30 0 * * *'
+    # GitHub drops/delays scheduled runs under load; hourly attempts make a missed day very unlikely.
+    # Already-published versions are skipped by the gate, so most runs are a no-op.
+    - cron: '17 * * * *'
 
 permissions:
   contents: write
