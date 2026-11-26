@@ -13,6 +13,7 @@ host gets them without building on the AUR each time.
 | `figcraft-bin` | 0.18.1-1 | [figcraft releases](https://github.com/storytold/figcraft/releases) | elonux | 2026-11-12 |
 | `frida-server-android-bin` | 17.27.4-1 | [frida releases](https://github.com/frida/frida/releases) | lapsus | 2026-11-21 |
 | `helium-browser-bin` | 0.22.2.1-1 | [helium-linux releases](https://github.com/imputnet/helium-linux/releases) | playleft | 2026-11-21 |
+| `localsend-bin` | 1.19.0-2 | [localsend releases](https://github.com/localsend/localsend/releases) | noureddinex | 2026-11-25 |
 | `morphe-desktop` | 2.3.0-1 | [morphe-desktop releases](https://github.com/MorpheApp/morphe-desktop/releases) | lapsus | 2026-11-21 |
 | `nuvio-desktop-bin` | 0.1.38alpha-1 | [NuvioDesktop releases](https://github.com/NuvioMedia/NuvioDesktop/releases) | glorious-yellow | 2026-11-19 |
 | `rstudio-desktop-bin` | 2026.11.0.203-1 | [RStudio download](https://download1.rstudio.org/electron/jammy/amd64/) | cbrnr | 2026-11-13 |
