@@ -56,20 +56,19 @@ jobs:
             pkg=$(basename "$dir")
             aur="/work/aur/$pkg"
             git clone --quiet --depth=1 "https://aur.archlinux.org/$pkg.git" "$aur"
-            info="$aur/.SRCINFO"
             revision=$(git -C "$aur" rev-parse --short HEAD)
-            grep -qx "pkgbase = $pkg" "$info"
-            grep -qx "pkgname = $pkg" "$info"
-            grep -v '^#' "$info" > "/work/$pkg.SRCINFO"
             # Keep local assets and apply any deliberate recipe overlay.
             cp -an "$dir/." "$aur/"
             if [[ -f "$dir/aur-update.patch" ]]; then
               patch -d "$aur" -p1 < "$dir/aur-update.patch"
             fi
             chown -R builder:builder "$aur"
-            su builder -c "cd '$aur' && makepkg --printsrcinfo" | grep -v '^#' \
-              | diff -u "/work/$pkg.SRCINFO" - \
-              || { echo "$pkg: AUR .SRCINFO does not match its PKGBUILD"; exit 1; }
+            info="/work/$pkg.SRCINFO"
+            su builder -c "cd '$aur' && makepkg --printsrcinfo" > "$info"
+            if ! grep -qx "pkgbase = $pkg" "$info" || ! grep -qx "pkgname = $pkg" "$info"; then
+              echo "$pkg: PKGBUILD package identity does not match AUR package" >&2
+              exit 1
+            fi
             ver=$(awk -F' = ' '$1 ~ /pkgver$/ {print $2; exit}' "$info")
             rel=$(awk -F' = ' '$1 ~ /pkgrel$/ {print $2; exit}' "$info")
             arch=x86_64

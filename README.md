@@ -53,8 +53,9 @@ install that follows comes from this repo.
 
 Each run fetches the current AUR recipe and publishes any version not already
 in the release. It does not commit refreshed AUR snapshots to this repository.
-CI uses AUR's `PKGBUILD` and `.SRCINFO`, overlays local-only assets from
-`aurpkgbuilds/<pkgname>/`, and applies an optional `aur-update.patch`. Put recipe
-customizations in that patch; edits to the vendored `PKGBUILD` alone are not used
-by CI. This executes upstream AUR build scripts automatically; the build job is
+CI uses AUR's `PKGBUILD` and derives metadata with `makepkg --printsrcinfo`.
+It overlays local-only assets from `aurpkgbuilds/<pkgname>/` and applies an
+optional `aur-update.patch`. Put recipe customizations in that patch; edits to
+the vendored `PKGBUILD` alone are not used by CI. This executes upstream AUR
+build scripts automatically; the build job is
 read-only, and a separate write-enabled job publishes its package artifacts.
