@@ -1,0 +1,25 @@
+--- a/PKGBUILD
++++ b/PKGBUILD
+@@ -22,6 +22,14 @@
+   cd "$srcdir"
+   tar Jxpf data.tar.xz -C "$pkgdir"
+ 
++  # Copilot language server (187 MB): RStudio only starts it on demand.
++  rm -rf "$pkgdir"/usr/lib/rstudio/resources/app/bin/copilot-language-server-js
++  # Development files, unused at runtime.
++  rm -rf "$pkgdir"/usr/lib/rstudio/include \
++         "$pkgdir"/usr/lib/rstudio/lib/cmake \
++         "$pkgdir"/usr/lib/rstudio/lib/pkgconfig \
++         "$pkgdir"/usr/lib/rstudio/lib/libgit2.a
++
+   install -dm755 "$pkgdir/usr/bin"
+ 
+   ln -s /usr/lib/rstudio/rstudio "$pkgdir/usr/bin/rstudio"
+@@ -30,4 +38,7 @@
+   ln -s /usr/lib/rstudio/resources/app/COPYING \
+     "$pkgdir/usr/share/licenses/$pkgname/COPYING"
+ 
++  [[ -x "$pkgdir"/usr/lib/rstudio/rstudio ]]
++  [[ ! -e "$pkgdir"/usr/lib/rstudio/resources/app/bin/copilot-language-server-js ]]
++
+ }

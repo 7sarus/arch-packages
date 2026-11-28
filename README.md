@@ -1,12 +1,12 @@
 # arch-packages
 
-A small Arch pacman repository built by GitHub Actions. It rebuilds the AUR
-packages listed below and publishes them from the `packages` release, so this
-host gets them without building on the AUR each time.
+A small Arch pacman repository built by GitHub Actions. Each workflow run fetches
+the latest AUR recipes for the packages below and publishes versions not already
+in the `packages` release.
 
 ## Packages
 
-| Package | Version | Upstream source | AUR maintainer | AUR last updated |
+| Package | Vendored snapshot | Upstream source | AUR maintainer in snapshot | AUR last updated in snapshot |
 | --- | --- | --- | --- | --- |
 | `ai-usagebar-bin` | 1.53.0-1 | [ai-usagebar releases](https://github.com/akitaonrails/ai-usagebar/releases) | akitaonrails | 2026-11-22 |
 | `betterbird-bin` | 153.7.0esr-1 | [betterbird.eu downloads](https://www.betterbird.eu/downloads/) | Posi | 2026-11-11 |
@@ -21,12 +21,12 @@ host gets them without building on the AUR each time.
 | `vectorcraft-bin` | 0.24.1-1 | [vectorcraft releases](https://github.com/storytold/vectorcraft/releases) | modinfo | 2026-11-12 |
 | `zotero-bin` | 10.0.8-2 | [zotero.org download](https://www.zotero.org/download) | juanmah | 2026-11-14 |
 
-The PKGBUILDs start as copies of the AUR packages, kept in
-`aurpkgbuilds/<pkgname>/`. Credit for them goes to the AUR maintainers above.
+The checked-in recipes are AUR snapshots; the table versions and maintainer
+credits describe those snapshots. CI fetches each current AUR recipe at run time,
+keeps local-only assets, and applies `aur-update.patch` when present. The RStudio
+overlay drops its bundled Copilot language server and unused development files.
 `zotero-bin` also credits contributor Matthias Kurz, and `helium-browser-bin`
-credits contributors Pujan Modha and init_harsh. `rstudio-desktop-bin` drops the
-bundled Copilot language server and the development files, which the IDE does
-not need at runtime. The rest are unchanged repackagings of upstream binaries.
+credits contributors Pujan Modha and init_harsh.
 
 ## Client setup
 
@@ -49,16 +49,12 @@ If the package is already installed from the AUR, remove it first with
 `sudo pacman -Rns <pkgname>`. Your user data in `~` is not touched, and the
 install that follows comes from this repo.
 
-## Updating a package
+## Package updates
 
-Copy the current AUR snapshot over the vendored files, commit, and push. The
-workflow rebuilds the changed package and overwrites the release assets.
-
-```bash
-curl -fsSL "https://aur.archlinux.org/cgit/aur.git/snapshot/zotero-bin.tar.gz" | \
-  tar xz --strip-components=1 -C aurpkgbuilds/zotero-bin
-```
-
-Running the same command for `helium-browser-bin` updates the other package.
-Check the snapshot for a `.gitignore` containing `*`, which would hide the copied
-files from git.
+Each run fetches the current AUR recipe and publishes any version not already
+in the release. It does not commit refreshed AUR snapshots to this repository.
+CI uses AUR's `PKGBUILD` and `.SRCINFO`, overlays local-only assets from
+`aurpkgbuilds/<pkgname>/`, and applies an optional `aur-update.patch`. Put recipe
+customizations in that patch; edits to the vendored `PKGBUILD` alone are not used
+by CI. This executes upstream AUR build scripts automatically; the build job is
+read-only, and a separate write-enabled job publishes its package artifacts.

@@ -13,13 +13,15 @@ on:
     - cron: '17 * * * *'
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
     runs-on: ubuntu-latest
     container:
       image: archlinux:base-devel
+    outputs:
+      changed: ${{ steps.gate.outputs.changed }}
     steps:
       - name: Check out PKGBUILDs
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -28,43 +30,58 @@ jobs:
 
       - name: Prepare builder
         run: |
-          pacman -Syu --noconfirm --needed git sudo curl jq
+          pacman -Syu --noconfirm --needed git sudo curl jq patch
           useradd -m builder
           install -d -m 0755 -o builder -g builder /work/src /work/new
           echo 'builder ALL=(ALL:ALL) NOPASSWD: /usr/bin/pacman' > /etc/sudoers.d/builder
           chmod 0440 /etc/sudoers.d/builder
 
-      - name: Check for new versions
+      - name: Fetch published package assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/tags/packages" \
+            | jq -r '.assets[]?.name' > /work/published-assets
+
+      - name: Check AUR package versions
         id: gate
         run: |
           set -euo pipefail
-          assets=$(curl -fsSL -H "Authorization: Bearer ${{ github.token }}" \
-            "https://api.github.com/repos/${{ github.repository }}/releases/tags/packages" \
-            | grep -o '"name": *"[^"]*"' | cut -d'"' -f4 || true)
+          mkdir -p /work/aur
           changed=""
           list=""
           for dir in "$GITHUB_WORKSPACE"/aurpkgbuilds/*/; do
             pkg=$(basename "$dir")
-            info="$dir/.SRCINFO"
-            # makepkg refuses to run as root and needs write access to the PKGBUILD dir, so use a builder-owned copy
-            mkdir -p /work/check
-            cp -r "$dir" "/work/check/$pkg"
-            chown -R builder:builder "/work/check/$pkg"
-            su builder -c "cd '/work/check/$pkg' && makepkg --printsrcinfo" | diff -q "$info" - >/dev/null \
-              || { echo "$pkg: .SRCINFO is out of date, regenerate with makepkg --printsrcinfo"; exit 1; }
+            aur="/work/aur/$pkg"
+            git clone --quiet --depth=1 "https://aur.archlinux.org/$pkg.git" "$aur"
+            info="$aur/.SRCINFO"
+            grep -qx "pkgbase = $pkg" "$info"
+            grep -qx "pkgname = $pkg" "$info"
+            # Keep local assets and apply any deliberate recipe overlay.
+            cp -an "$dir/." "$aur/"
+            if [[ -f "$dir/aur-update.patch" ]]; then
+              patch -d "$aur" -p1 < "$dir/aur-update.patch"
+            fi
+            chown -R builder:builder "$aur"
+            su builder -c "cd '$aur' && makepkg --printsrcinfo" | diff -q "$info" - >/dev/null \
+              || { echo "$pkg: AUR .SRCINFO does not match its PKGBUILD"; exit 1; }
             ver=$(awk -F' = ' '$1 ~ /pkgver$/ {print $2; exit}' "$info")
             rel=$(awk -F' = ' '$1 ~ /pkgrel$/ {print $2; exit}' "$info")
             arch=x86_64
             if awk -F' = ' '$1 ~ /arch$/ {print $2}' "$info" | grep -qx any; then
               arch=any
             fi
+            echo "$pkg: AUR $(git -C "$aur" rev-parse --short HEAD) ($ver-$rel)"
             file="$pkg-$ver-$rel-$arch.pkg.tar.zst"
-            if printf '%s\n' "$assets" | grep -qx "$file"; then
+            if grep -Fqx "$file" /work/published-assets; then
               echo "$pkg $ver-$rel already published"
             else
               changed="${changed}${changed:+ }$pkg"
               list="$list$pkg $ver-$rel"$'\n'
             fi
+            rm -rf "$aur/.git"
           done
           printf '%s' "$list" > /work/build-list
           echo "changed=$changed" >> "$GITHUB_OUTPUT"
@@ -77,7 +94,7 @@ jobs:
           #!/bin/bash
           set -euo pipefail
           while read -r pkg full; do
-            cp -r "/work/aurpkgbuilds/$pkg" "/work/src/$pkg"
+            cp -r "/work/aur/$pkg" "/work/src/$pkg"
             cd "/work/src/$pkg"
             makepkg -s --noconfirm --nocheck --skippgpcheck
             # Ship only the files makepkg names, and only under this directory's name and version
@@ -92,18 +109,52 @@ jobs:
           done < /work/build-list
           EOS
           chmod +x /work/build.sh
-          cp -r "$GITHUB_WORKSPACE/aurpkgbuilds" /work/aurpkgbuilds
           chown -R builder:builder /work
           su builder -c /work/build.sh
 
-      - name: Create package database
+      - name: Upload packages
         if: steps.gate.outputs.changed != ''
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: new-packages
+          path: /work/new/*.pkg.tar.zst
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    needs: build
+    if: needs.build.outputs.changed != ''
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:base-devel
+    permissions:
+      contents: write
+    steps:
+      - name: Check out package list
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Prepare publisher
+        run: |
+          pacman -Syu --noconfirm --needed curl jq
+          install -d /work/new /work/db
+
+      - name: Download packages
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: new-packages
+          path: /work/new
+
+      - name: Create package database
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          mkdir -p /work/db && cd /work/db
+          cd /work/db
           api="https://api.github.com/repos/${{ github.repository }}/releases/tags/packages"
           # Rebuild from every published package, not just this run's output
-          urls=$(curl -fsSL -H "Authorization: Bearer ${{ github.token }}" "$api" \
+          urls=$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" "$api" \
             | jq -r '.assets[].browser_download_url | select(endswith(".pkg.tar.zst"))')
           while read -r url; do curl -fsSLO "$url"; done <<< "$urls"
           [[ $(ls *.pkg.tar.zst | wc -l) -eq $(wc -l <<< "$urls") ]] \
@@ -121,12 +172,11 @@ jobs:
           cp arch-packages.files.tar.gz arch-packages.files
 
       - name: Publish release
-        if: steps.gate.outputs.changed != ''
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           tag_name: packages
           name: Arch packages
-          body: Auto-built from the PKGBUILDs vendored in this repository.
+          body: Auto-built from current AUR recipes with local overlays.
           overwrite_files: true
           fail_on_unmatched_files: true
           files: |
